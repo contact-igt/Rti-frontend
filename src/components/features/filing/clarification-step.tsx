@@ -3,9 +3,9 @@ import { FormEvent, useState } from "react";
 import type { ClarificationState, RTIJurisdiction } from "@/types/filing";
 
 export function ClarificationStep({ clarification, pending, onBack, onSubmit }: { clarification: NonNullable<ClarificationState>; pending: boolean; onBack: () => void; onSubmit: (answer: { text?: string; jurisdiction?: RTIJurisdiction; state?: string }) => void }) {
-  const [text, setText] = useState("");
-  const [jurisdiction, setJurisdiction] = useState<RTIJurisdiction>("unknown");
-  const [stateName, setStateName] = useState("");
+  const [text, setText] = useState(clarification.answer?.text ?? "");
+  const [jurisdiction, setJurisdiction] = useState<RTIJurisdiction>(clarification.answer?.jurisdiction ?? "unknown");
+  const [stateName, setStateName] = useState(clarification.answer?.state ?? "");
   const [error, setError] = useState("");
   const asksJurisdiction = clarification.jurisdiction === "unknown" && clarification.source === "authority";
 

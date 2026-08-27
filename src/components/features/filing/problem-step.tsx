@@ -27,7 +27,7 @@ export function ProblemStep({ initialProblem, pending, onSubmit }: { initialProb
         <label htmlFor="problem">Explain what happened and what you want to find out</label>
         <textarea id="problem" value={problem} onChange={(event) => setProblem(event.target.value)} rows={8} maxLength={5000} aria-describedby={`problem-help${error ? " problem-error" : ""}`} aria-invalid={Boolean(error)} autoFocus />
         <div className="field-meta"><span id="problem-help">Do not include passwords, bank details or identity numbers.</span><span>{problem.length} / 5,000</span></div>
-        {error ? <p className="field-error" id="problem-error">{error}</p> : null}
+        {error ? <p className="field-error" id="problem-error" role="alert">{error}</p> : null}
       </div>
       <div className="example-list"><p>Examples</p>{examples.map((example) => <button type="button" key={example} onClick={() => setProblem(example)}>{example}</button>)}</div>
       <div className="step-actions step-actions--end"><button className="button button--primary button--large" type="submit" disabled={pending}>{pending ? "Understanding your request…" : <>Understand my issue <ArrowRight aria-hidden="true" /></>}</button></div>

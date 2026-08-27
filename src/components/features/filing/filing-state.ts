@@ -1,4 +1,4 @@
-import type { FilingState, RTIApplicant, RTIDraft, SelectedAuthority, SupportingDocument } from "@/types/filing";
+import type { ClarificationAttempt, FilingState, RTIApplicant, RTIDraft, SelectedAuthority, SupportingDocument } from "@/types/filing";
 
 export const emptyApplicant: RTIApplicant = {
   fullName: "",
@@ -21,6 +21,7 @@ export const initialFilingState: FilingState = {
   analysis: null,
   analysisMeta: null,
   clarification: null,
+  clarificationHistory: [],
   authorityResolution: null,
   authority: null,
   draft: null,
@@ -39,6 +40,7 @@ export type FilingAction =
   | { type: "SET_PROBLEM"; problem: string }
   | { type: "SET_ANALYSIS"; analysis: FilingState["analysis"]; meta: FilingState["analysisMeta"]; effectiveProblem: string }
   | { type: "SET_CLARIFICATION"; clarification: FilingState["clarification"] }
+  | { type: "RECORD_CLARIFICATION"; attempt: ClarificationAttempt }
   | { type: "SET_AUTHORITY_RESOLUTION"; resolution: FilingState["authorityResolution"] }
   | { type: "SET_AUTHORITY"; authority: SelectedAuthority }
   | { type: "SET_DRAFT"; draft: RTIDraft }
@@ -56,10 +58,11 @@ export function filingReducer(state: FilingState, action: FilingAction): FilingS
     case "HYDRATE": return { ...initialFilingState, ...action.state, applicant: emptyApplicant, documents: [], review: null, paymentProof: null, application: null, receipt: null };
     case "SET_SUBMISSION_KEY": return { ...state, submissionKey: action.key };
     case "SET_PROBLEM":
-      return { ...state, problem: action.problem, effectiveProblem: action.problem, analysis: null, analysisMeta: null, clarification: null, authorityResolution: null, authority: null, draft: null, review: null, paymentProof: null };
+      return { ...state, problem: action.problem, effectiveProblem: action.problem, analysis: null, analysisMeta: null, clarification: null, clarificationHistory: [], authorityResolution: null, authority: null, draft: null, review: null, paymentProof: null };
     case "SET_ANALYSIS":
       return { ...state, analysis: action.analysis, analysisMeta: action.meta, effectiveProblem: action.effectiveProblem, clarification: null, authorityResolution: null, authority: null, draft: null, review: null, paymentProof: null };
     case "SET_CLARIFICATION": return { ...state, clarification: action.clarification, stage: "clarification" };
+    case "RECORD_CLARIFICATION": return { ...state, clarificationHistory: [...state.clarificationHistory, action.attempt] };
     case "SET_AUTHORITY_RESOLUTION": return { ...state, authorityResolution: action.resolution, stage: "authority" };
     case "SET_AUTHORITY": {
       const changed = state.authority?.authorityId !== action.authority.authorityId;

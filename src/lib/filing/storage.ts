@@ -3,7 +3,7 @@ import type { FilingState } from "@/types/filing";
 const FILING_KEY = "rti-saathi:filing-progress";
 const START_PROBLEM_KEY = "rti-saathi:start-problem";
 
-type PersistedFiling = Pick<FilingState, "stage" | "problem" | "effectiveProblem" | "analysis" | "analysisMeta" | "authorityResolution" | "authority" | "draft" | "submissionKey">;
+type PersistedFiling = Pick<FilingState, "stage" | "problem" | "effectiveProblem" | "analysis" | "analysisMeta" | "clarification" | "clarificationHistory" | "authorityResolution" | "authority" | "draft" | "submissionKey">;
 
 export function saveFilingProgress(state: FilingState): void {
   if (typeof window === "undefined" || state.stage === "receipt") return;
@@ -13,6 +13,8 @@ export function saveFilingProgress(state: FilingState): void {
     effectiveProblem: state.effectiveProblem,
     analysis: state.analysis,
     analysisMeta: state.analysisMeta,
+    clarification: state.clarification,
+    clarificationHistory: state.clarificationHistory,
     authorityResolution: state.authorityResolution,
     authority: state.authority,
     draft: state.draft,

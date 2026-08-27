@@ -3,7 +3,7 @@ import type { FilingStage } from "@/types/filing";
 const steps = ["Your issue", "Authority", "RTI request", "Your details", "Review", "Submit"] as const;
 
 const progressByStage: Record<FilingStage, number> = {
-  problem: 0, analysis: 0, clarification: 0, "state-blocked": 0,
+  problem: 0, analysis: 0, clarification: 0, "authority-unsupported": 0, "state-blocked": 0,
   authority: 1, draft: 2, applicant: 3, review: 4, auth: 5, payment: 5, receipt: 5,
 };
 
