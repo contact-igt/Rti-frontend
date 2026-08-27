@@ -1,2 +1,5 @@
-import { PlaceholderPage } from "@/components/shared/placeholder-page";
-export default function LearnPage() { return <PlaceholderPage title="Learn" description="RTI guidance will be introduced here." />; }
+import { redirect } from "next/navigation";
+
+export default function LearnPage() {
+  redirect("/#what-is-rti");
+}

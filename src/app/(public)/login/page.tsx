@@ -1,2 +1,6 @@
-import { PlaceholderPage } from "@/components/shared/placeholder-page";
-export default function LoginPage() { return <PlaceholderPage title="Login" description="Authentication is not part of this scaffold." />; }
+import { Suspense } from "react";
+import { LoginScreen } from "@/components/features/auth/login-screen";
+
+export default function LoginPage() {
+  return <Suspense fallback={<main id="main-content" className="account-page"><div className="container route-loading">Preparing secure sign-in…</div></main>}><LoginScreen /></Suspense>;
+}

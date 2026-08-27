@@ -1,13 +1,10 @@
 export const routes = {
   home: "/",
+  start: "/start",
   fileRti: "/file-rti",
   track: "/track",
   applications: "/applications",
-  appeal: "/appeal",
-  replyAnalyser: "/reply-analyser",
   learn: "/learn",
-  help: "/help",
-  profile: "/profile",
   login: "/login",
 } as const;
 

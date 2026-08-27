@@ -1,2 +1,2 @@
-import { PlaceholderPage } from "@/components/shared/placeholder-page";
-export default function ApplicationsPage() { return <PlaceholderPage title="Applications" description="Your RTI application list will be available here." />; }
+import { ApplicationsScreen } from "@/components/features/applications/applications-screen";
+export default function ApplicationsPage() { return <ApplicationsScreen />; }
