@@ -5,13 +5,15 @@ import { useEffect, useReducer, useRef, useState } from "react";
 import { getSession, login as loginRequest } from "@/lib/api/auth";
 import { clearSession, readSession, writeSession } from "@/lib/auth/session";
 import { createApplication, createDemoPayment, findAuthority, generateDraft, reviewFiling, validateApplicant, analyseRTI } from "@/lib/api/rti";
+import { clarificationIdentity, hasSubmittedClarification, previousClarificationAnswer } from "@/lib/filing/clarification-history";
 import { clearFilingProgress, readFilingProgress, saveFilingProgress, takeStartProblem } from "@/lib/filing/storage";
 import { toCitizenError, type CitizenError } from "@/lib/filing/errors";
-import type { AuthorityOption, DemoPaymentMode, RTIJurisdiction } from "@/types/filing";
+import type { AuthorityOption, ClarificationAnswer, ClarificationAttempt, DemoPaymentMode, RTIAnalysis, RTIJurisdiction } from "@/types/filing";
 import { AnalysisStep } from "./analysis-step";
 import { ApplicantStep } from "./applicant-step";
 import { AuthStep } from "./auth-step";
 import { AuthorityStep } from "./authority-step";
+import { AuthorityUnsupported } from "./authority-unsupported";
 import { ClarificationStep } from "./clarification-step";
 import { DraftStep } from "./draft-step";
 import { FilingError } from "./filing-error";
@@ -28,6 +30,7 @@ export function FilingShell() {
   const [pendingText, setPendingText] = useState("");
   const [error, setError] = useState<CitizenError | null>(null);
   const retryRef = useRef<(() => void) | null>(null);
+  const submissionInFlightRef = useRef(false);
   const shellRef = useRef<HTMLDivElement>(null);
   const errorRef = useRef<HTMLDivElement>(null);
 
@@ -92,12 +95,19 @@ export function FilingShell() {
     });
   }
 
-  function resolveAuthority(jurisdictionAnswer?: RTIJurisdiction, stateName?: string) {
+  function resolveAuthority(jurisdictionAnswer?: RTIJurisdiction, stateName?: string, submittedAttempt?: ClarificationAttempt) {
     if (!state.analysis) return;
+    const analysis = state.analysis;
+    const history = submittedAttempt ? [...state.clarificationHistory, submittedAttempt] : state.clarificationHistory;
     void perform("Checking the likely authority…", async () => {
-      const response = await findAuthority({ analysis: state.analysis!, jurisdictionAnswer, state: stateName || undefined });
+      const response = await findAuthority({ analysis, jurisdictionAnswer, state: stateName || undefined });
       if (response.data.status === "clarification_required") {
-        dispatch({ type: "SET_CLARIFICATION", clarification: { source: "authority", question: response.data.question, jurisdiction: response.data.jurisdiction } });
+        const prompt = { question: response.data.question, jurisdiction: response.data.jurisdiction };
+        if (hasSubmittedClarification(history, prompt, analysis)) {
+          dispatch({ type: "GO", stage: "authority-unsupported" });
+          return;
+        }
+        dispatch({ type: "SET_CLARIFICATION", clarification: { source: "authority", ...prompt, answer: previousClarificationAnswer(history, prompt) } });
       } else {
         dispatch({ type: "SET_AUTHORITY_RESOLUTION", resolution: response.data });
       }
@@ -106,15 +116,25 @@ export function FilingShell() {
 
   function answerClarification(answer: { text?: string; jurisdiction?: RTIJurisdiction; state?: string }) {
     if (!state.clarification || !state.analysis) return;
-    if (answer.jurisdiction) { resolveAuthority(answer.jurisdiction, answer.state); return; }
+    const clarification = state.clarification;
+    if (answer.jurisdiction) {
+      const attempt = createClarificationAttempt(clarification, answer, state.analysis);
+      dispatch({ type: "RECORD_CLARIFICATION", attempt });
+      resolveAuthority(answer.jurisdiction, answer.state, attempt);
+      return;
+    }
     if (state.clarification.source === "authority" && state.clarification.jurisdiction === "state") {
-      resolveAuthority("state", answer.text);
+      const attempt = createClarificationAttempt(clarification, answer, state.analysis);
+      dispatch({ type: "RECORD_CLARIFICATION", attempt });
+      resolveAuthority("state", answer.text, attempt);
       return;
     }
     const effectiveProblem = `${state.effectiveProblem || state.problem}\nAdditional detail: ${answer.text}`;
     void perform("Understanding the added detail…", async () => {
       const response = await analyseRTI(effectiveProblem);
+      const attempt = createClarificationAttempt(clarification, answer, response.data);
       dispatch({ type: "SET_ANALYSIS", analysis: response.data, meta: response.meta ?? null, effectiveProblem });
+      dispatch({ type: "RECORD_CLARIFICATION", attempt });
       if (response.data.clarificationNeeded && response.data.clarificationQuestion) {
         dispatch({ type: "SET_CLARIFICATION", clarification: { source: "analysis", question: response.data.clarificationQuestion, jurisdiction: response.data.jurisdiction } });
       } else {
@@ -181,15 +201,17 @@ export function FilingShell() {
   }
 
   function submitApplication() {
+    if (submissionInFlightRef.current) return;
     const session = readSession();
     if (!session || !state.review || !state.paymentProof) { dispatch({ type: "GO", stage: session ? "payment" : "auth" }); return; }
     const submissionKey = state.submissionKey || createSubmissionKey();
     if (!state.submissionKey) dispatch({ type: "SET_SUBMISSION_KEY", key: submissionKey });
+    submissionInFlightRef.current = true;
     void perform("Creating your application…", async () => {
       const response = await createApplication({ submissionKey, review: state.review!, payment: state.paymentProof!.payment, paymentProofToken: state.paymentProof!.paymentProofToken }, session.token);
       dispatch({ type: "SET_RECEIPT", application: response.data.application, receipt: response.data.receipt });
       clearFilingProgress();
-    });
+    }).finally(() => { submissionInFlightRef.current = false; });
   }
 
   function startOver() {
@@ -211,7 +233,8 @@ export function FilingShell() {
           {error ? <FilingError message={error.message} onRetry={retryRef.current ?? undefined} errorRef={errorRef} /> : null}
           {state.stage === "problem" ? <ProblemStep key={state.problem} initialProblem={state.problem} pending={pending} onSubmit={analyseProblem} /> : null}
           {state.stage === "analysis" && state.analysis ? <AnalysisStep analysis={state.analysis} meta={state.analysisMeta} pending={pending} onContinue={() => resolveAuthority()} onEdit={() => dispatch({ type: "GO", stage: "problem" })} /> : null}
-          {state.stage === "clarification" && state.clarification ? <ClarificationStep clarification={state.clarification} pending={pending} onBack={() => dispatch({ type: "GO", stage: state.analysis ? "analysis" : "problem" })} onSubmit={answerClarification} /> : null}
+          {state.stage === "clarification" && state.clarification ? <ClarificationStep key={`${state.clarification.source}:${state.clarification.jurisdiction}:${state.clarification.question}`} clarification={state.clarification} pending={pending} onBack={() => dispatch({ type: "GO", stage: state.analysis ? "analysis" : "problem" })} onSubmit={answerClarification} /> : null}
+          {state.stage === "authority-unsupported" ? <AuthorityUnsupported onEdit={() => dispatch({ type: "GO", stage: "problem" })} onStartOver={startOver} /> : null}
           {state.stage === "authority" && state.authorityResolution?.status === "recommended" ? <AuthorityStep resolution={state.authorityResolution} selectedId={state.authority?.authorityId} pending={pending} onBack={() => dispatch({ type: "GO", stage: "analysis" })} onConfirm={confirmAuthority} /> : null}
           {state.stage === "draft" && state.draft && state.authority ? <DraftStep draft={state.draft} authority={state.authority} onBack={() => dispatch({ type: "GO", stage: "authority" })} onChange={(draft) => dispatch({ type: "EDIT_DRAFT", draft })} onContinue={() => dispatch({ type: "GO", stage: "applicant" })} /> : null}
           {state.stage === "applicant" ? <ApplicantStep applicant={state.applicant} documents={state.documents} pending={pending} onBack={() => dispatch({ type: "GO", stage: "draft" })} onApplicantChange={(applicant) => dispatch({ type: "SET_APPLICANT", applicant })} onDocumentsChange={(documents) => dispatch({ type: "SET_DOCUMENTS", documents })} onSubmit={prepareReview} /> : null}
@@ -224,4 +247,18 @@ export function FilingShell() {
       </div>
     </main>
   );
+}
+
+function createClarificationAttempt(
+  clarification: { question: string; jurisdiction: RTIJurisdiction },
+  answer: ClarificationAnswer,
+  analysis: RTIAnalysis,
+): ClarificationAttempt {
+  return {
+    identity: clarificationIdentity(clarification, analysis),
+    question: clarification.question,
+    jurisdiction: clarification.jurisdiction,
+    answer,
+    submitted: true,
+  };
 }

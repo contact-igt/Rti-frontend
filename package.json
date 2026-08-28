@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "test": "node --experimental-strip-types --test tests/clarification-history.test.mjs tests/filing-state.test.mjs tests/return-path.test.mjs",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit"
   },

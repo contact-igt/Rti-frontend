@@ -217,6 +217,7 @@ export type FilingStage =
   | "problem"
   | "analysis"
   | "clarification"
+  | "authority-unsupported"
   | "authority"
   | "draft"
   | "applicant"
@@ -230,7 +231,22 @@ export type ClarificationState = {
   source: "analysis" | "authority";
   question: string;
   jurisdiction: RTIJurisdiction;
+  answer?: ClarificationAnswer;
 } | null;
+
+export type ClarificationAnswer = {
+  text?: string;
+  jurisdiction?: RTIJurisdiction;
+  state?: string;
+};
+
+export type ClarificationAttempt = {
+  identity: string;
+  question: string;
+  jurisdiction: RTIJurisdiction;
+  answer: ClarificationAnswer;
+  submitted: true;
+};
 
 export type FilingState = {
   stage: FilingStage;
@@ -239,6 +255,7 @@ export type FilingState = {
   analysis: RTIAnalysis | null;
   analysisMeta: ResponseMeta | null;
   clarification: ClarificationState;
+  clarificationHistory: ClarificationAttempt[];
   authorityResolution: AuthorityResolution | null;
   authority: SelectedAuthority | null;
   draft: RTIDraft | null;
